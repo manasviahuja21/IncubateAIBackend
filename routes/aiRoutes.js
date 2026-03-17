@@ -9,7 +9,7 @@ if (!apiKey) {
   console.error("GEMINI_API_KEY is not set!");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenAI(apiKey);
 
 router.post("/analyze", async (req, res) => {
   try {
