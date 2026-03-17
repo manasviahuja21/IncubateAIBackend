@@ -106,18 +106,44 @@ Analyze this idea:
 "${ideaText}"
     `;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
+    // const model = genAI.getGenerativeModel({
+    //   model: "gemini-2.5-flash",
+    //   generationConfig: {
+    //     responseMimeType: "application/json", // This forces JSON output
+    //   },
+    // });
+
+    const result = await genAI.models.generateContent(
+      {model: 'gemini-2.5-flash',
+  contents: prompt,
+  generationConfig: {
         responseMimeType: "application/json", // This forces JSON output
       },
-    });
+});
 
-    const result = await model.generateContent(prompt);
-    const jsonText = result.response.text();
-    const json = JSON.parse(jsonText);
+    // const jsonText = result.text;
+    // //const json = JSON.parse(jsonText);
 
-    res.json(json);
+    // res.json(jsonText);
+    let json;
+
+try {
+  let jsonText = result.text.trim();
+
+  // 🧠 remove ```json and ``` wrappers
+  if (jsonText.startsWith("```")) {
+    jsonText = jsonText.replace(/```json\s*/i, "").replace(/```$/, "").trim();
+  }
+
+  json = JSON.parse(jsonText);
+  res.json(json);
+
+} catch (err) {
+  console.error("Parsing failed. Raw response:", result.text);
+  return res.status(500).json({
+    error: "Invalid JSON from AI",
+  });
+}
 
   } catch (error) {
     console.error(error);
