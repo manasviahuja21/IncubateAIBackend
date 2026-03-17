@@ -1,5 +1,5 @@
 import express from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {GoogleGenAI} from '@google/genai';
 import { configDotenv } from "dotenv";
 const router = express.Router();
 configDotenv();
@@ -107,7 +107,7 @@ Analyze this idea:
     `;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json", // This forces JSON output
       },
