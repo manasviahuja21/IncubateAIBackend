@@ -114,7 +114,7 @@ Analyze this idea:
     // });
 
     const result = await genAI.models.generateContent(
-      {model: 'gemini-3.0-pro',
+      {model: 'gemini-3.1-pro',
   contents: prompt,
   generationConfig: {
         responseMimeType: "application/json", // This forces JSON output
