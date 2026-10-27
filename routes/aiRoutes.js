@@ -1,9 +1,10 @@
 import express from "express";
-import {GoogleGenAI} from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { configDotenv } from "dotenv";
+
 const router = express.Router();
 configDotenv();
-// 1. Ensure this variable is actually loaded (e.g., using dotenv)
+
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error("GEMINI_API_KEY is not set!");
@@ -14,6 +15,10 @@ const genAI = new GoogleGenAI(apiKey);
 router.post("/analyze", async (req, res) => {
   try {
     const ideaText = req.body.idea;
+    if (!ideaText) {
+      return res.status(400).json({ error: "Missing 'idea' in request body" });
+    }
+
     const prompt = `
       You are an expert startup analyst and venture capitalist. Your task is to analyze the provided business idea and return a comprehensive, structured analysis in a strict JSON format.
 
@@ -106,48 +111,70 @@ Analyze this idea:
 "${ideaText}"
     `;
 
-    // const model = genAI.getGenerativeModel({
-    //   model: "gemini-2.5-flash",
-    //   generationConfig: {
-    //     responseMimeType: "application/json", // This forces JSON output
-    //   },
-    // });
+    // Comprehensive fallback array covering all current high-availability model lanes
+    const fallbackModels = [
+      "gemini-4-argon",
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-flash-latest"
+    ];
 
-    const result = await genAI.models.generateContent(
-      {model: 'gemini-3.8-flash',
-  contents: prompt,
-  generationConfig: {
-        responseMimeType: "application/json", // This forces JSON output
-      },
-});
+    let result = null;
+    let lastError = null;
 
-    // const jsonText = result.text;
-    // //const json = JSON.parse(jsonText);
+    // Sequentially loop through every fallback model until one responds successfully
+    for (const modelName of fallbackModels) {
+      try {
+        console.log(`Attempting analysis with model: ${modelName}...`);
+        result = await genAI.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          generationConfig: {
+            responseMimeType: "application/json", // Ensures strict JSON output formatting
+          },
+        });
 
-    // res.json(jsonText);
+        if (result && result.text) {
+          console.log(`Successfully generated content using model: ${modelName}`);
+          break; 
+        }
+      } catch (err) {
+        console.warn(`Model '${modelName}' encountered an issue: ${err.message}. Trying next fallback lane...`);
+        lastError = err;
+        continue;
+      }
+    }
+
+    if (!result || !result.text) {
+      throw lastError || new Error("All fallback model lanes are currently experiencing heavy traffic surges.");
+    }
+
     let json;
+    try {
+      let jsonText = result.text.trim();
 
-try {
-  let jsonText = result.text.trim();
+      // Clean up markdown block wrappers if present
+      if (jsonText.startsWith("```")) {
+        jsonText = jsonText.replace(/```json\s*/i, "").replace(/```$/, "").trim();
+      }
 
-  // 🧠 remove ```json and ``` wrappers
-  if (jsonText.startsWith("```")) {
-    jsonText = jsonText.replace(/```json\s*/i, "").replace(/```$/, "").trim();
-  }
+      json = JSON.parse(jsonText);
+      return res.json(json);
 
-  json = JSON.parse(jsonText);
-  res.json(json);
-
-} catch (err) {
-  console.error("Parsing failed. Raw response:", result.text);
-  return res.status(500).json({
-    error: "Invalid JSON from AI",
-  });
-}
+    } catch (parseErr) {
+      console.error("JSON parsing failed. Raw response was:", result.text);
+      return res.status(500).json({
+        error: "Invalid JSON response structure from AI model",
+      });
+    }
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("Route execution error:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
